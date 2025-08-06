@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Ultimate - PDAM Tirta Intan</title>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet.js (Pustaka Peta) CSS & JS via CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Chart.js (Pustaka Grafik) via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* CSS Variabel untuk Tema */
+        :root {
+            --bg-color: #f8fafc; /* slate-50 */
+            --card-bg: rgba(255, 255, 255, 0.5);
+            --card-border: rgba(255, 255, 255, 0.7);
+            --text-primary: #0f172a; /* slate-900 */
+            --text-secondary: #475569; /* slate-600 */
+            --accent-color: #0ea5e9; /* sky-500 */
+            --accent-color-dark: #0284c7; /* sky-600 */
+        }
+
+        /* Animasi & Keyframes */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slow-pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.3); }
+            50% { transform: scale(1.05); box-shadow: 0 0 10px 10px rgba(14, 165, 233, 0); }
+        }
+
+        .fade-in { animation: fadeIn 0.3s ease-in-out forwards; }
+        .fade-out { animation: fadeOut 0.2s ease-in-out forwards; }
+        .animate-slide-up { animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+
+        /* Gaya UI Tambahan */
+        #map { height: 100%; width: 100%; border-radius: 1rem; background-color: #e0f2fe; }
+        .page-content:not(.active) { display: none; }
+        
+        /* Navigasi Aktif dengan Gaya "Pill" */
+        .nav-link.active {
+            color: white;
+            background-color: var(--accent-color);
+        }
+        
+        /* Kustomisasi Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Custom marker styling yang diperbarui */
+        .custom-marker {
+            position: relative;
+            width: 32px; height: 32px;
+            background: var(--accent-color);
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            border: 2px solid white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2), inset 0 0 0 2px rgba(255,255,255,0.3);
+            display: flex; justify-content: center; align-items: center;
+        }
+        .custom-marker-inner {
+            transform: rotate(45deg);
+            color: white;
+        }
+        .marker-selected {
+            animation: slow-pulse 1.5s infinite;
+        }
+
+        /* Helper untuk animasi stagger */
+        .stagger-child {
+             opacity: 0;
+             animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 font-['Inter'] antialiased overflow-hidden">
+
+    <!-- Aurora Background yang Ditingkatkan -->
+    <div class="absolute top-0 left-0 w-full h-full -z-10 overflow-hidden">
+        <div class="absolute top-[-20%] left-[10%] w-[500px] h-[500px] bg-sky-200 rounded-full filter blur-3xl opacity-30 animate-pulse duration-[8000ms]"></div>
+        <div class="absolute bottom-[-25%] right-[5%] w-[700px] h-[700px] bg-fuchsia-200 rounded-full filter blur-3xl opacity-30 animate-pulse duration-[10000ms]"></div>
+    </div>
+
+    <div class="flex flex-col h-screen">
+        <!-- Navbar Utama yang Didesain Ulang -->
+        <header class="sticky top-0 z-50 px-6">
+            <div class="container mx-auto mt-4 flex items-center justify-between h-20 bg-white/60 backdrop-blur-xl rounded-2xl shadow-lg border border-white/50 px-6">
+                <!-- Logo & Nama -->
+                <div class="flex items-center gap-x-4">
+                     <div class="p-2.5 bg-white rounded-xl shadow-md transform hover:scale-105 transition-transform">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-sky-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.002 6.002 0 0110.532 2.123c.398.922.844 2.235 1.072 3.22a.75.75 0 01-1.45.32c-.22-.95-.62-2.16-1.026-3.075A4.502 4.502 0 005.48 7.876a.75.75 0 01-1.148-.15z" clip-rule="evenodd" /></svg>
+                    </div>
+                    <h1 class="text-xl font-bold text-slate-800 tracking-wider">TIRTA INTAN</h1>
+                </div>
+
+                <!-- Navigasi Links dengan Gaya "Pill" -->
+                <nav class="flex items-center justify-center h-16 bg-slate-100/70 p-1.5 rounded-full shadow-inner">
+                    <a href="#" data-page="page-dashboard" class="nav-link text-center px-6 py-2.5 rounded-full text-sm font-semibold text-slate-600 hover:bg-white/70 transition-all duration-300">Dashboard</a>
+                    <a href="#" data-page="page-peta" class="nav-link text-center px-6 py-2.5 rounded-full text-sm font-semibold text-slate-600 hover:bg-white/70 transition-all duration-300">Peta Jaringan</a>
+                    <a href="#" data-page="page-input" class="nav-link text-center px-6 py-2.5 rounded-full text-sm font-semibold text-slate-600 hover:bg-white/70 transition-all duration-300">Input Data</a>
+                    <a href="#" data-page="page-daftar" class="nav-link text-center px-6 py-2.5 rounded-full text-sm font-semibold text-slate-600 hover:bg-white/70 transition-all duration-300">Pelanggan</a>
+                    <a href="#" data-page="page-analitik" class="nav-link text-center px-6 py-2.5 rounded-full text-sm font-semibold text-slate-600 hover:bg-white/70 transition-all duration-300">Analitik</a>
+                </nav>
+
+                <!-- Profil Pengguna yang Ditingkatkan -->
+                <div class="flex items-center gap-x-4">
+                     <button class="text-slate-500 hover:text-sky-500 relative transform hover:scale-110 transition-transform">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                        <span class="absolute -top-1 -right-1 flex h-3 w-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>
+                     </button>
+                    <div class="flex items-center gap-x-3">
+                        <img class="h-11 w-11 rounded-full object-cover ring-2 ring-offset-2 ring-sky-300" src="https://i.pravatar.cc/150?u=admin" alt="Admin"/>
+                        <div class="text-right">
+                           <p class="font-semibold text-sm text-slate-800">Admin</p>
+                           <p class="text-xs text-slate-500">Administrator</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Area Konten Utama -->
+        <div id="app-container" class="flex-1 overflow-y-auto pt-4 pb-8 px-6">
+            <main class="container mx-auto">
+                <!-- Halaman: Dashboard -->
+                <div id="page-dashboard" class="page-content">
+                    <h2 class="text-3xl font-extrabold text-slate-800 mb-6">Dashboard Ringkasan</h2>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Kolom Utama -->
+                        <div class="lg:col-span-2 space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <!-- Kartu Metrik yang Didesain Ulang -->
+                                <div class="dashboard-card bg-[var(--card-bg)] backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/60 hover:shadow-xl transition-shadow duration-300">
+                                    <div class="flex justify-between items-start">
+                                        <p class="text-slate-500 font-medium">Total Pelanggan</p>
+                                        <div class="p-2 bg-sky-100/80 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg></div>
+                                    </div>
+                                    <p class="text-4xl font-bold text-slate-800 mt-2" id="total-pelanggan">0</p>
+                                    <div class="h-1.5 w-full bg-sky-100 rounded-full mt-4"><div class="h-1.5 bg-gradient-to-r from-sky-400 to-sky-600 w-3/4 rounded-full"></div></div>
+                                </div>
+                                <div class="dashboard-card bg-[var(--card-bg)] backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/60 hover:shadow-xl transition-shadow duration-300">
+                                    <div class="flex justify-between items-start">
+                                        <p class="text-slate-500 font-medium">Pelanggan Aktif</p>
+                                        <div class="p-2 bg-emerald-100/80 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+                                    </div>
+                                    <p class="text-4xl font-bold text-slate-800 mt-2" id="pelanggan-aktif">0</p>
+                                    <div class="h-1.5 w-full bg-emerald-100 rounded-full mt-4"><div class="h-1.5 bg-gradient-to-r from-emerald-400 to-emerald-600 w-11/12 rounded-full"></div></div>
+                                </div>
+                                <div class="dashboard-card bg-[var(--card-bg)] backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/60 hover:shadow-xl transition-shadow duration-300">
+                                    <div class="flex justify-between items-start">
+                                        <p class="text-slate-500 font-medium">Menunggak</p>
+                                        <div class="p-2 bg-amber-100/80 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+                                    </div>
+                                    <p class="text-4xl font-bold text-slate-800 mt-2" id="pelanggan-menunggak">0</p>
+                                    <div class="h-1.5 w-full bg-amber-100 rounded-full mt-4"><div class="h-1.5 bg-gradient-to-r from-amber-400 to-amber-600 w-1/4 rounded-full"></div></div>
+                                </div>
+                            </div>
+                            <!-- Grafik di Dashboard -->
+                            <div class="dashboard-card bg-[var(--card-bg)] backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/60">
+                                <h3 class="text-xl font-semibold mb-4 text-slate-700">Pertumbuhan Pelanggan (6 Bulan Terakhir)</h3>
+                                <div class="h-80"><canvas id="growthChart"></canvas></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Kolom Samping -->
+                        <div class="space-y-6">
+                            <div class="bg-[var(--card-bg)] backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/60 space-y-4">
+                                <h3 class="text-xl font-semibold text-slate-700">Aktivitas Terbaru</h3>
+                                <ul id="activity-list" class="space-y-4">
+                                    <li class="flex items-center gap-4 text-sm stagger-child"><div class="w-10 h-10 bg-sky-100 text-sky-600 rounded-lg flex items-center justify-center shrink-0"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg></div><div><p class="font-semibold text-slate-800">Pelanggan baru ditambahkan</p><p class="text-slate-500">Ahmad Zulkifli - 2 jam lalu</p></div></li>
+                                    <li class="flex items-center gap-4 text-sm stagger-child"><div class="w-10 h-10 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center shrink-0"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div><div><p class="font-semibold text-slate-800">Tunggakan terdeteksi</p><p class="text-slate-500">Asep Sunandar - Kemarin</p></div></li>
+                                    <li class="flex items-center gap-4 text-sm stagger-child"><div class="w-10 h-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center shrink-0"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></div><div><p class="font-semibold text-slate-800">Pelanggan dihapus</p><p class="text-slate-500">Eko Prasetyo - 3 hari lalu</p></div></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Halaman: Peta -->
+                <div id="page-peta" class="page-content h-[calc(100vh-140px)]">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
+                        <aside class="lg:col-span-4 bg-[var(--card-bg)] backdrop-blur-lg p-6 rounded-2xl shadow-lg flex flex-col space-y-4 h-full border border-white/60">
+                            <h2 class="text-2xl font-bold text-slate-800 border-b border-slate-200 pb-4">Filter & Detail</h2>
+                            <div id="customerDetail" class="border rounded-xl p-4 bg-sky-50/50 transition-all duration-300">
+                                <h3 class="text-lg font-semibold text-slate-800 mb-3 flex items-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-sky-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>Detail Pelanggan</h3>
+                                <div id="detailContent"><p class="text-center py-4 text-slate-500">Pilih pelanggan dari daftar atau peta.</p></div>
+                            </div>
+                            <div class="flex-1 flex flex-col min-h-0">
+                                <h3 class="text-lg font-semibold text-slate-800 mb-2">Cari Pelanggan</h3>
+                                <input type="text" id="mapSearchInput" placeholder="Ketik nama atau No. Pelanggan..." class="w-full p-3 bg-white/80 border border-slate-300 rounded-lg mb-4 focus:ring-2 focus:ring-sky-500 focus:outline-none transition">
+                                <div id="mapCustomerList" class="flex-1 overflow-y-auto pr-2 space-y-2"></div>
+                            </div>
+                        </aside>
+                        <section class="lg:col-span-8 bg-transparent rounded-2xl min-h-[500px] h-full shadow-lg">
+                            <div id="map"></div>
+                        </section>
+                    </div>
+                </div>
+
+                <!-- Halaman: Input Data -->
+                <div id="page-input" class="page-content">
+                    <h2 class="text-3xl font-bold text-slate-800 mb-6">Input Data Pelanggan Baru</h2>
+                    <div class="bg-[var(--card-bg)] backdrop-blur-lg p-8 rounded-2xl shadow-lg max-w-3xl mx-auto border border-white/60">
+                         <form class="space-y-6">
+                            <div class="relative">
+                                <label for="nama" class="block text-sm font-medium text-slate-700 mb-1">Nama Lengkap</label>
+                                <div class="absolute inset-y-0 left-0 top-6 flex items-center pl-4 pointer-events-none"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg></div>
+                                <input type="text" id="nama" class="block w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 transition">
+                            </div>
+                             <div class="relative">
+                                <label for="no_pelanggan" class="block text-sm font-medium text-slate-700 mb-1">Nomor Pelanggan</label>
+                                <div class="absolute inset-y-0 left-0 top-6 flex items-center pl-4 pointer-events-none"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2h8a2 2 0 012 2v10a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 011-1h2a1 1 0 110 2H8a1 1 0 01-1-1zm-1 4a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" /></svg></div>
+                                <input type="text" id="no_pelanggan" placeholder="Contoh: PDAM-00678" class="block w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 transition">
+                            </div>
+                             <div>
+                                <label for="alamat" class="block text-sm font-medium text-slate-700 mb-1">Alamat</label>
+                                <textarea id="alamat" rows="3" class="block w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 transition"></textarea>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="lat" class="block text-sm font-medium text-slate-700 mb-1">Latitude</label>
+                                    <input type="text" id="lat" placeholder="-7.21xxx" class="block w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 transition">
+                                </div>
+                                <div>
+                                    <label for="lon" class="block text-sm font-medium text-slate-700 mb-1">Longitude</label>
+                                    <input type="text" id="lon" placeholder="107.90xxx" class="block w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 transition">
+                                </div>
+                            </div>
+                            <div class="flex justify-end pt-4">
+                                <button type="submit" class="px-8 py-3 bg-sky-500 text-white font-semibold rounded-lg shadow-lg shadow-sky-500/30 hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-50 focus:ring-sky-500 transform hover:-translate-y-1 transition-all duration-300">Simpan Data</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Halaman: Daftar Pelanggan -->
+                <div id="page-daftar" class="page-content">
+                    <h2 class="text-3xl font-bold text-slate-800 mb-6">Daftar Semua Pelanggan</h2>
+                    <div class="bg-[var(--card-bg)] backdrop-blur-lg rounded-2xl shadow-lg overflow-hidden border border-white/60">
+                        <div class="p-4 border-b border-slate-200/50">
+                            <input type="text" id="tableSearchInput" placeholder="Cari di seluruh data pelanggan..." class="w-full md:w-1/2 p-3 bg-white/80 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none transition">
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead class="bg-slate-50/50">
+                                    <tr>
+                                        <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Nama</th>
+                                        <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">No. Pelanggan</th>
+                                        <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Alamat</th>
+                                        <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
+                                        <th class="px-6 py-4 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="customerTableBody" class="divide-y divide-slate-200/50"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Halaman: Analitik -->
+                <div id="page-analitik" class="page-content">
+                     <h2 class="text-3xl font-bold text-slate-800 mb-6">Analitik Pelanggan</h2>
+                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-[var(--card-bg)] backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/60">
+                             <h3 class="text-xl font-semibold mb-4 text-slate-700">Komposisi Status Pelanggan</h3>
+                             <div class="relative h-96 w-full max-w-sm mx-auto"><canvas id="statusChart"></canvas></div>
+                        </div>
+                         <div class="bg-[var(--card-bg)] backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/60">
+                             <h3 class="text-xl font-semibold mb-4 text-slate-700">Pelanggan Baru per Bulan</h3>
+                             <div class="relative h-96 w-full"><canvas id="barChart"></canvas></div>
+                        </div>
+                     </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // DATA PELANGGAN (MOCK DATA)
+    const pelangganData = [
+        { id: 1, nama: "Budi Santoso", no_pelanggan: "PDAM-00123", alamat: "Jl. Cimanuk No. 15, Garut Kota", status: "Aktif", koordinat: [-7.2155, 107.9081] },
+        { id: 2, nama: "Siti Aminah", no_pelanggan: "PDAM-00234", alamat: "Jl. Papandayan No. 42, Tarogong Kaler", status: "Aktif", koordinat: [-7.1998, 107.8955] },
+        { id: 3, nama: "Asep Sunandar", no_pelanggan: "PDAM-00345", alamat: "Perumahan Bumi Cempaka Indah B-10", status: "Tunggakan 1 Bulan", koordinat: [-7.2250, 107.8860] },
+        { id: 4, nama: "Dewi Lestari", no_pelanggan: "PDAM-00456", alamat: "Jl. Ahmad Yani No. 210, Garut", status: "Aktif", koordinat: [-7.2183, 107.9152] },
+        { id: 5, nama: "Eko Prasetyo", no_pelanggan: "PDAM-00567", alamat: "Kampung Sukagalih RT 02/RW 05", status: "Non-Aktif", koordinat: [-7.2074, 107.9234] }
+    ];
+
+    // VARIABEL GLOBAL
+    const navLinks = document.querySelectorAll('.nav-link');
+    const pages = document.querySelectorAll('.page-content');
+    const appContainer = document.getElementById('app-container');
+    let map;
+    let statusChart, barChart, growthChart;
+    let mapInitialized = false;
+    const markers = {};
+
+    // --- CHART.JS GLOBAL CONFIGURATION ---
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.color = '#64748b'; // slate-500
+    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, 0.8)'; // slate-900
+    Chart.defaults.plugins.tooltip.titleFont = { size: 14, weight: 'bold' };
+    Chart.defaults.plugins.tooltip.bodyFont = { size: 12 };
+    Chart.defaults.plugins.tooltip.padding = 12;
+    Chart.defaults.plugins.tooltip.cornerRadius = 8;
+    Chart.defaults.plugins.tooltip.boxPadding = 4;
+
+    // FUNGSI NAVIGASI SPA
+    function showPage(pageId) {
+        appContainer.classList.add('fade-out');
+        
+        setTimeout(() => {
+            pages.forEach(page => page.classList.remove('active'));
+            const targetPage = document.getElementById(pageId);
+            targetPage.classList.add('active');
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.dataset.page === pageId) {
+                    link.classList.add('active');
+                }
+            });
+
+            // Inisialisasi on-demand
+            if (pageId === 'page-dashboard') initializeDashboardAnimations();
+            if (pageId === 'page-peta' && !mapInitialized) { initializeMap(); mapInitialized = true; }
+            else if (pageId === 'page-peta' && map) { setTimeout(() => map.invalidateSize(), 100); }
+
+            if (pageId === 'page-analitik' && !statusChart) initializeAnalyticCharts();
+            
+            appContainer.scrollTop = 0; // Scroll to top on page change
+            appContainer.classList.remove('fade-out');
+            appContainer.classList.add('fade-in');
+            setTimeout(() => appContainer.classList.remove('fade-in'), 300);
+
+        }, 200);
+    }
+    
+    // FUNGSI INISIALISASI
+    function initializeDashboardAnimations() {
+        const cards = document.querySelectorAll('.dashboard-card');
+        cards.forEach((card, index) => {
+            card.style.animationDelay = `${index * 100}ms`;
+            card.classList.add('animate-slide-up');
+        });
+        const activityItems = document.querySelectorAll('#activity-list .stagger-child');
+        activityItems.forEach((item, index) => {
+             item.style.animationDelay = `${300 + index * 120}ms`;
+        });
+        if (!growthChart) initializeGrowthChart();
+    }
+
+    function initializeMap() {
+        map = L.map('map', { zoomControl: false }).setView([-7.216, 107.906], 13);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/positron_nolabels/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; CARTO', maxZoom: 20
+        }).addTo(map);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        createMapMarkers();
+    }
+    
+    function initializeAnalyticCharts() {
+        const ctxStatus = document.getElementById('statusChart').getContext('2d');
+        const ctxBar = document.getElementById('barChart').getContext('2d');
+        const aktif = pelangganData.filter(p => p.status === 'Aktif').length;
+        const menunggak = pelangganData.filter(p => p.status.includes('Tunggakan')).length;
+        const nonAktif = pelangganData.filter(p => p.status === 'Non-Aktif').length;
+        
+        statusChart = new Chart(ctxStatus, { type: 'doughnut', data: { labels: ['Aktif', 'Menunggak', 'Non-Aktif'], datasets: [{ data: [aktif, menunggak, nonAktif], backgroundColor: ['#10b981', '#f59e0b', '#ef4444'], borderColor: 'var(--card-bg)', borderWidth: 6, hoverOffset: 15 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#475569', font: { size: 14 }, padding: 20 } } }, cutout: '70%' } });
+        barChart = new Chart(ctxBar, { type: 'bar', data: { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'], datasets: [{ label: 'Pelanggan Baru', data: [12, 19, 3, 5, 2, 3], backgroundColor: 'rgba(14, 165, 233, 0.6)', borderColor: 'rgb(14, 165, 233)', borderWidth: 2, borderRadius: 6, hoverBackgroundColor: 'rgba(14, 165, 233, 0.8)' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { padding: 10 } }, x: { grid: { display: false }, ticks: { padding: 10 } } } } });
+    }
+
+    function initializeGrowthChart() {
+         const ctxGrowth = document.getElementById('growthChart').getContext('2d');
+         const gradient = ctxGrowth.createLinearGradient(0, 0, 0, 300);
+         gradient.addColorStop(0, 'rgba(14, 165, 233, 0.3)');
+         gradient.addColorStop(1, 'rgba(14, 165, 233, 0)');
+         
+         growthChart = new Chart(ctxGrowth, { type: 'line', data: { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'], datasets: [{ label: 'Pelanggan', data: [65, 59, 80, 81, 56, 55], fill: true, backgroundColor: gradient, borderColor: 'var(--accent-color)', tension: 0.4, pointBackgroundColor: 'var(--accent-color)', pointBorderColor: '#fff', pointHoverRadius: 8, pointHoverBorderWidth: 2, pointRadius: 5 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { padding: 10 } }, x: { grid: { display: false }, ticks: { padding: 10 } } } } });
+    }
+
+    // FUNGSI TAMPILAN
+    function displayCustomerTable(data) {
+        const tableBody = document.getElementById('customerTableBody');
+        tableBody.innerHTML = '';
+        data.forEach((customer) => {
+            const statusInfo = getStatusClass(customer.status);
+            const row = document.createElement('tr');
+            row.className = `hover:bg-sky-50/50 transition-colors duration-200`;
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-medium text-slate-900">${customer.nama}</div></td>
+                <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-slate-500 font-mono">${customer.no_pelanggan}</div></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600 max-w-xs truncate">${customer.alamat}</td>
+                <td class="px-6 py-4 whitespace-nowrap"><span class="inline-flex items-center gap-x-2 px-3 py-1 text-xs font-semibold rounded-full ${statusInfo.bg} ${statusInfo.text}"><span class="h-2 w-2 rounded-full" style="background-color: ${statusInfo.markerColor};"></span>${customer.status}</span></td>
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                    <button data-id="${customer.id}" title="Lihat di Peta" class="view-map-btn p-2 text-slate-500 hover:text-sky-600 rounded-full hover:bg-sky-100 transition-colors">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    </button>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
+        document.querySelectorAll('.view-map-btn').forEach(btn => btn.addEventListener('click', (e) => {
+            const customerId = parseInt(e.currentTarget.dataset.id);
+            showPage('page-peta');
+            setTimeout(() => panToCustomer(customerId), 300);
+        }));
+    }
+    
+    function panToCustomer(customerId) { const customer = pelangganData.find(p => p.id === customerId); if (customer && map) { map.flyTo(customer.koordinat, 17); if (markers[customerId]) { markers[customerId].openPopup(); markers[customerId].getElement().classList.add('marker-selected'); setTimeout(() => { if(markers[customerId]) markers[customerId].getElement().classList.remove('marker-selected'); }, 3000); } showCustomerDetails(customerId); }}
+    function showCustomerDetails(customerId) { const customer = pelangganData.find(p => p.id === customerId); if (!customer) return; const detailContentDiv = document.getElementById('detailContent'); const statusInfo = getStatusClass(customer.status); detailContentDiv.innerHTML = `<div class="space-y-2 text-sm"> <p><strong>Nama:</strong><br><span class="text-slate-700 text-base font-semibold">${customer.nama}</span></p> <p><strong>No. Pelanggan:</strong><br><span class="text-slate-700 font-mono">${customer.no_pelanggan}</span></p> <p><strong>Alamat:</strong><br><span class="text-slate-700">${customer.alamat}</span></p> <p><strong>Status:</strong><br><span class="inline-flex items-center gap-x-2 px-3 py-1 text-xs font-semibold rounded-full ${statusInfo.bg} ${statusInfo.text}"><span class="h-2 w-2 rounded-full" style="background-color: ${statusInfo.markerColor};"></span>${customer.status}</span></p> </div>`; }
+    function createMapMarkers() { pelangganData.forEach(customer => { const statusInfo = getStatusClass(customer.status); const customIcon = L.divIcon({ className: '', html: `<div class="custom-marker" style="background-color: ${statusInfo.markerColor};"><div class="custom-marker-inner">${statusInfo.icon}</div></div>`, iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32] }); const marker = L.marker(customer.koordinat, { icon: customIcon }).addTo(map); marker.bindPopup(`<b>${customer.nama}</b><br>${customer.no_pelanggan}`); markers[customer.id] = marker; marker.on('click', () => { panToCustomer(customer.id); }); }); }
+    function displayMapCustomerList(data) { const customerListDiv = document.getElementById('mapCustomerList'); customerListDiv.innerHTML = ''; if (data.length === 0) { customerListDiv.innerHTML = '<p class="text-center text-slate-500">Tidak ditemukan.</p>'; return; } data.forEach((customer, index) => { const itemDiv = document.createElement('div'); itemDiv.className = 'p-3 border-b border-slate-200/80 cursor-pointer hover:bg-white/80 transition-all duration-200 stagger-child'; itemDiv.style.animationDelay = `${index * 50}ms`; itemDiv.innerHTML = `<p class="font-semibold text-slate-800">${customer.nama}</p><p class="text-sm text-slate-500">${customer.no_pelanggan}</p>`; itemDiv.addEventListener('click', () => { panToCustomer(customer.id); }); customerListDiv.appendChild(itemDiv); }); }
+    function updateDashboardCards() { const aktif = pelangganData.filter(p => p.status === 'Aktif').length; const menunggak = pelangganData.filter(p => p.status.includes('Tunggakan')).length; document.getElementById('total-pelanggan').textContent = pelangganData.length; document.getElementById('pelanggan-aktif').textContent = aktif; document.getElementById('pelanggan-menunggak').textContent = menunggak; }
+    function getStatusClass(status) { const s = status.toLowerCase(); if (s === 'aktif') return { bg: 'bg-emerald-100', text: 'text-emerald-800', markerColor: '#10b981', icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>` }; if (s.includes('tunggakan')) return { bg: 'bg-amber-100', text: 'text-amber-800', markerColor: '#f59e0b', icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01" /></svg>` }; return { bg: 'bg-red-100', text: 'text-red-800', markerColor: '#ef4444', icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>` }; }
+
+    // EVENT LISTENERS
+    navLinks.forEach(link => link.addEventListener('click', (e) => { e.preventDefault(); showPage(link.dataset.page); }));
+    document.getElementById('mapSearchInput').addEventListener('input', (e) => { const searchTerm = e.target.value.toLowerCase(); const filteredData = pelangganData.filter(p => p.nama.toLowerCase().includes(searchTerm) || p.no_pelanggan.toLowerCase().includes(searchTerm)); displayMapCustomerList(filteredData); });
+    document.getElementById('tableSearchInput').addEventListener('input', (e) => { const searchTerm = e.target.value.toLowerCase(); const filteredData = pelangganData.filter(p => p.nama.toLowerCase().includes(searchTerm) || p.no_pelanggan.toLowerCase().includes(searchTerm) || p.alamat.toLowerCase().includes(searchTerm)); displayCustomerTable(filteredData); });
+
+    // INISIALISASI AWAL
+    showPage('page-dashboard');
+    updateDashboardCards();
+    displayMapCustomerList(pelangganData);
+    displayCustomerTable(pelangganData);
+});
+</script>
+
+</body>
+</html>
